@@ -31,13 +31,19 @@ const IconSend = () => <Icon d="M22 2 11 13M22 2 15 22l-4-9-9-4 20-7z" />;
 const IconPlus = () => <Icon d="M12 5v14M5 12h14" />;
 const IconTrash = () => <Icon d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />;
 const IconCheck = () => <Icon d="M20 6 9 17l-5-5" />;
-const IconWifi = () => (
-  <Icon d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
+const IconQr = () => (
+  <Icon
+    size={15}
+    d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h3v3h-3zM20 15h1v1h-1zM15 20h1v1h-1zM18 18h3v3h-3z"
+  />
 );
+const IconX = () => <Icon d="M18 6 6 18M6 6l12 12" />;
 
 export default function App() {
   const [tab, setTab] = useState("contactos");
   const [status, setStatus] = useState("desconectado");
+  const [qrImg, setQrImg] = useState(null);
+  const [showQrModal, setShowQrModal] = useState(false);
   const [contactos, setContactos] = useState([]);
   const [mensaje, setMensaje] = useState("");
   const [mensajeEdit, setMensajeEdit] = useState("");
@@ -48,7 +54,6 @@ export default function App() {
   const [enviando, setEnviando] = useState(false);
   const [toast, setToast] = useState(null);
   const [guardando, setGuardando] = useState(false);
-  const [qrImg, setQrImg] = useState(null);
 
   const showToast = (msg, tipo = "ok") => {
     setToast({ msg, tipo });
@@ -58,17 +63,13 @@ export default function App() {
   const cargarDatos = useCallback(async () => {
     try {
       const [s, c, m, h] = await Promise.all([
-        fetcher("/api/status")
-          .then((s) => {
-            setStatus(s.status);
-            setQrImg(s.qr);
-          })
-          .catch(() => {}),
+        fetcher("/api/status"),
         fetcher("/api/contactos"),
         fetcher("/api/mensaje"),
         fetcher("/api/historial"),
       ]);
       setStatus(s.status);
+      setQrImg(s.qr || null);
       setContactos(c);
       setMensaje(m.texto);
       setMensajeEdit(m.texto);
@@ -80,9 +81,14 @@ export default function App() {
     cargarDatos();
     const interval = setInterval(() => {
       fetcher("/api/status")
-        .then((s) => setStatus(s.status))
+        .then((s) => {
+          setStatus(s.status);
+          setQrImg(s.qr || null);
+          // Si el bot se conectó, cerrar el modal automáticamente
+          if (s.status === "listo") setShowQrModal(false);
+        })
         .catch(() => {});
-    }, 10000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [cargarDatos]);
 
@@ -160,6 +166,53 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL QR */}
+      {showQrModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowQrModal(false)}>
+          <div style={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div style={styles.modalTitle}>Vincular WhatsApp</div>
+              <button
+                style={styles.btnClose}
+                onClick={() => setShowQrModal(false)}
+              >
+                <IconX />
+              </button>
+            </div>
+            {qrImg ? (
+              <>
+                <div style={styles.qrWrapper}>
+                  <img src={qrImg} alt="QR WhatsApp" style={styles.qrImg} />
+                </div>
+                <div style={styles.modalSteps}>
+                  <div style={styles.modalStep}>
+                    <span style={styles.stepNum}>1</span> Abrí WhatsApp en tu
+                    celular
+                  </div>
+                  <div style={styles.modalStep}>
+                    <span style={styles.stepNum}>2</span> Tocá los tres puntos →
+                    Dispositivos vinculados
+                  </div>
+                  <div style={styles.modalStep}>
+                    <span style={styles.stepNum}>3</span> Escaneá este código
+                  </div>
+                </div>
+                <div style={styles.modalHint}>
+                  El modal se cierra solo al conectarse
+                </div>
+              </>
+            ) : (
+              <div style={styles.modalLoading}>
+                <div style={styles.spinner} />
+                <div style={{ color: "#64748b", fontSize: 14, marginTop: 12 }}>
+                  Generando QR...
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <header style={styles.header}>
         <div style={styles.headerLeft}>
@@ -169,39 +222,19 @@ export default function App() {
             <div style={styles.logoSub}>Panel de recordatorios</div>
           </div>
         </div>
-        <div style={styles.statusBadge}>
-          <div style={{ ...styles.statusDot, background: statusColor }} />
-          <span style={{ color: statusColor, fontSize: 13, fontWeight: 600 }}>
-            {statusLabel}
-          </span>
-        </div>
-        {status === "esperando_qr" && qrImg && (
-          <div
-            style={{
-              background: "#fff",
-              padding: 16,
-              borderRadius: 12,
-              display: "inline-block",
-              margin: "16px 24px",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 13,
-                color: "#111",
-                marginBottom: 8,
-                fontWeight: 600,
-              }}
-            >
-              Escaneá con WhatsApp → Dispositivos vinculados
-            </div>
-            <img
-              src={qrImg}
-              alt="QR WhatsApp"
-              style={{ width: 220, height: 220, display: "block" }}
-            />
+        <div style={styles.headerRight}>
+          {status === "esperando_qr" && (
+            <button style={styles.btnQr} onClick={() => setShowQrModal(true)}>
+              <IconQr /> Ver QR
+            </button>
+          )}
+          <div style={styles.statusBadge}>
+            <div style={{ ...styles.statusDot, background: statusColor }} />
+            <span style={{ color: statusColor, fontSize: 13, fontWeight: 600 }}>
+              {statusLabel}
+            </span>
           </div>
-        )}
+        </div>
       </header>
 
       {/* TABS */}
@@ -231,8 +264,6 @@ export default function App() {
                 Contactos <span style={styles.badge}>{contactos.length}</span>
               </h2>
             </div>
-
-            {/* Agregar */}
             <div style={styles.addBox}>
               <input
                 style={styles.input}
@@ -251,13 +282,10 @@ export default function App() {
                 <IconPlus /> Agregar
               </button>
             </div>
-
             <div style={styles.hint}>
               Formato: código país + código área sin 0 + número. Ejemplo:{" "}
               <code style={styles.code}>5492346123456</code>
             </div>
-
-            {/* Lista */}
             <div style={styles.list}>
               {contactos.length === 0 && (
                 <div style={styles.empty}>
@@ -297,7 +325,6 @@ export default function App() {
                 </button>
               )}
             </div>
-
             {editando ? (
               <>
                 <textarea
@@ -308,7 +335,7 @@ export default function App() {
                 />
                 <div style={styles.hint}>
                   Usá <code style={styles.code}>{"{{fecha}}"}</code> y se
-                  reemplazará automáticamente con la fecha del envío.
+                  reemplazará con la fecha del envío.
                 </div>
                 <div style={styles.btnRow}>
                   <button
@@ -336,13 +363,11 @@ export default function App() {
                 ))}
               </div>
             )}
-
-            {/* Enviar ahora */}
             <div style={styles.sendBox}>
               <div>
                 <div style={styles.sendTitle}>Envío manual</div>
                 <div style={styles.sendSub}>
-                  El envío automático ocurre el día 27 de cada mes a las 10:00
+                  El envío automático ocurre el día 1 de cada mes a las 10:00
                   hs.
                 </div>
               </div>
@@ -415,6 +440,10 @@ export default function App() {
           </div>
         )}
       </main>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
@@ -445,6 +474,94 @@ const styles = {
     fontWeight: 600,
     boxShadow: "0 4px 20px rgba(0,0,0,.4)",
   },
+
+  // Modal
+  modalOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,.7)",
+    zIndex: 100,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalBox: {
+    background: "#1a2035",
+    borderRadius: 16,
+    padding: 28,
+    width: "100%",
+    maxWidth: 360,
+    boxShadow: "0 20px 60px rgba(0,0,0,.6)",
+    border: "1px solid #2d3748",
+  },
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: { fontWeight: 700, fontSize: 17, color: "#f1f5f9" },
+  btnClose: {
+    background: "transparent",
+    border: "none",
+    color: "#64748b",
+    cursor: "pointer",
+    padding: 4,
+    display: "flex",
+  },
+  qrWrapper: {
+    background: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  qrImg: { width: 220, height: 220, display: "block" },
+  modalSteps: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    marginBottom: 16,
+  },
+  modalStep: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    fontSize: 13,
+    color: "#94a3b8",
+  },
+  stepNum: {
+    width: 22,
+    height: 22,
+    borderRadius: "50%",
+    background: "#0f3460",
+    color: "#22c55e",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 11,
+    fontWeight: 700,
+    flexShrink: 0,
+  },
+  modalHint: { fontSize: 11, color: "#475569", textAlign: "center" },
+  modalLoading: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    padding: "30px 0",
+  },
+  spinner: {
+    width: 36,
+    height: 36,
+    border: "3px solid #2d3748",
+    borderTop: "3px solid #22c55e",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
+  },
+
+  // Header
   header: {
     padding: "20px 24px",
     borderBottom: "1px solid #1e2535",
@@ -453,6 +570,7 @@ const styles = {
     justifyContent: "space-between",
   },
   headerLeft: { display: "flex", alignItems: "center", gap: 12 },
+  headerRight: { display: "flex", alignItems: "center", gap: 10 },
   logo: { fontSize: 32 },
   logoTitle: { fontWeight: 700, fontSize: 17, color: "#f1f5f9" },
   logoSub: { fontSize: 12, color: "#64748b" },
@@ -465,6 +583,21 @@ const styles = {
     borderRadius: 20,
   },
   statusDot: { width: 8, height: 8, borderRadius: "50%" },
+  btnQr: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "6px 12px",
+    background: "#2d1f00",
+    border: "1px solid #f59e0b",
+    borderRadius: 20,
+    color: "#f59e0b",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+  },
+
+  // Nav
   nav: {
     display: "flex",
     borderBottom: "1px solid #1e2535",
@@ -484,10 +617,9 @@ const styles = {
     borderBottom: "2px solid transparent",
     transition: "all .2s",
   },
-  tabActive: {
-    color: "#22c55e",
-    borderBottomColor: "#22c55e",
-  },
+  tabActive: { color: "#22c55e", borderBottomColor: "#22c55e" },
+
+  // Content
   main: { padding: "24px 24px 0" },
   section: { display: "flex", flexDirection: "column", gap: 16 },
   sectionHeader: {
