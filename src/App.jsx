@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+import logo from "./logo.svg";
 
 const fetcher = (url, opts) =>
   fetch(`${API}${url}`, opts).then((r) => r.json());
@@ -215,8 +216,14 @@ export default function App() {
 
       {/* HEADER */}
       <header style={styles.header}>
-        <div style={styles.headerLeft}>
-          <div style={styles.logo}>💚</div>
+        <div style={{ ...styles.headerLeft, justifyContent: "center" }}>
+          <div style={{ width: 32, height: 32 }}>
+            <img
+              style={{ width: "100%", height: "100%" }}
+              src={logo}
+              alt="Logo Corazón"
+            />
+          </div>
           <div>
             <div style={styles.logoTitle}>Hogar de Ancianos</div>
             <div style={styles.logoSub}>Panel de recordatorios</div>
