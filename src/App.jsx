@@ -439,7 +439,7 @@ export default function App() {
               <div>
                 <div style={styles.sendTitle}>Envío manual</div>
                 <div style={styles.sendSub}>
-                  El envío automático ocurre el día 1 de cada mes a las 10:00
+                  El envío automático ocurre el día 10 de cada mes a las 10:00
                   hs.
                 </div>
               </div>
