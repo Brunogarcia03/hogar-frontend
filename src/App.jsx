@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 import logo from "./logo.svg";
@@ -6,7 +6,6 @@ import logo from "./logo.svg";
 const fetcher = (url, opts) =>
   fetch(`${API}${url}`, opts).then((r) => r.json());
 
-// ─── ICONS ────────────────────────────────────────────────────────────────────
 const Icon = ({ d, size = 18 }) => (
   <svg
     width={size}
@@ -39,6 +38,14 @@ const IconQr = () => (
   />
 );
 const IconX = () => <Icon d="M18 6 6 18M6 6l12 12" />;
+const IconCalendar = () => (
+  <Icon
+    size={14}
+    d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
+  />
+);
+
+const TAG = "{{fecha}}";
 
 export default function App() {
   const [tab, setTab] = useState("contactos");
@@ -55,6 +62,7 @@ export default function App() {
   const [enviando, setEnviando] = useState(false);
   const [toast, setToast] = useState(null);
   const [guardando, setGuardando] = useState(false);
+  const textareaRef = useRef(null);
 
   const showToast = (msg, tipo = "ok") => {
     setToast({ msg, tipo });
@@ -85,13 +93,52 @@ export default function App() {
         .then((s) => {
           setStatus(s.status);
           setQrImg(s.qr || null);
-          // Si el bot se conectó, cerrar el modal automáticamente
           if (s.status === "listo") setShowQrModal(false);
         })
         .catch(() => {});
     }, 5000);
     return () => clearInterval(interval);
   }, [cargarDatos]);
+
+  // ── Botón booleano de fecha ───────────────────────────────────────────────
+  const tieneFecha = mensajeEdit.includes(TAG);
+
+  const toggleFecha = () => {
+    if (tieneFecha) {
+      // Quitar el tag (y espacios/saltos de línea extra alrededor)
+      setMensajeEdit(
+        mensajeEdit
+          .replace(/\n?{{fecha}}\n?/g, "\n")
+          .replace(/\n{3,}/g, "\n\n")
+          .trimEnd(),
+      );
+    } else {
+      // Insertar en la posición del cursor si el textarea tiene foco, sino al final
+      const ta = textareaRef.current;
+      if (ta && document.activeElement === ta) {
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        const before = mensajeEdit.slice(0, start);
+        const after = mensajeEdit.slice(end);
+        const insert =
+          (before.length && !before.endsWith("\n") ? "\n" : "") +
+          TAG +
+          (after.length && !after.startsWith("\n") ? "\n" : "");
+        const next = before + insert + after;
+        setMensajeEdit(next);
+        // Restaurar cursor después del tag
+        requestAnimationFrame(() => {
+          const pos = before.length + insert.length;
+          ta.selectionStart = pos;
+          ta.selectionEnd = pos;
+          ta.focus();
+        });
+      } else {
+        // Agregar al final
+        setMensajeEdit(mensajeEdit.trimEnd() + "\n" + TAG);
+      }
+    }
+  };
 
   const agregarContacto = async () => {
     if (!nuevoNombre.trim() || !nuevoNumero.trim()) return;
@@ -155,7 +202,6 @@ export default function App() {
 
   return (
     <div style={styles.root}>
-      {/* TOAST */}
       {toast && (
         <div
           style={{
@@ -167,7 +213,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL QR */}
       {showQrModal && (
         <div style={styles.modalOverlay} onClick={() => setShowQrModal(false)}>
           <div style={styles.modalBox} onClick={(e) => e.stopPropagation()}>
@@ -214,14 +259,13 @@ export default function App() {
         </div>
       )}
 
-      {/* HEADER */}
       <header style={styles.header}>
         <div style={{ ...styles.headerLeft, justifyContent: "center" }}>
           <div style={{ width: 32, height: 32 }}>
             <img
               style={{ width: "100%", height: "100%" }}
               src={logo}
-              alt="Logo Corazón"
+              alt="Logo"
             />
           </div>
           <div>
@@ -244,7 +288,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* TABS */}
       <nav style={styles.nav}>
         {[
           { id: "contactos", label: "Contactos", icon: <IconUsers /> },
@@ -261,9 +304,7 @@ export default function App() {
         ))}
       </nav>
 
-      {/* CONTENT */}
       <main style={styles.main}>
-        {/* ── CONTACTOS ── */}
         {tab === "contactos" && (
           <div style={styles.section}>
             <div style={styles.sectionHeader}>
@@ -318,7 +359,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── MENSAJE ── */}
         {tab === "mensaje" && (
           <div style={styles.section}>
             <div style={styles.sectionHeader}>
@@ -332,18 +372,42 @@ export default function App() {
                 </button>
               )}
             </div>
+
             {editando ? (
               <>
                 <textarea
+                  ref={textareaRef}
                   style={styles.textarea}
                   value={mensajeEdit}
                   onChange={(e) => setMensajeEdit(e.target.value)}
                   rows={10}
                 />
-                <div style={styles.hint}>
-                  Usá <code style={styles.code}>{"{{fecha}}"}</code> y se
-                  reemplazará con la fecha del envío.
+
+                {/* Toolbar con botón booleano de fecha */}
+                <div style={styles.toolbar}>
+                  <button
+                    style={{
+                      ...styles.btnTag,
+                      ...(tieneFecha ? styles.btnTagActive : {}),
+                    }}
+                    onClick={toggleFecha}
+                    title={
+                      tieneFecha
+                        ? "Quitar fecha del mensaje"
+                        : "Insertar fecha en el mensaje"
+                    }
+                  >
+                    <IconCalendar />
+                    {"fecha"}
+                    {tieneFecha && <span style={styles.tagCheck}>✓</span>}
+                  </button>
+                  <span style={styles.toolbarHint}>
+                    {tieneFecha
+                      ? "La fecha se incluye en el mensaje"
+                      : "Clic para insertar la fecha"}
+                  </span>
                 </div>
+
                 <div style={styles.btnRow}>
                   <button
                     style={styles.btnGhost}
@@ -370,6 +434,7 @@ export default function App() {
                 ))}
               </div>
             )}
+
             <div style={styles.sendBox}>
               <div>
                 <div style={styles.sendTitle}>Envío manual</div>
@@ -394,7 +459,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── HISTORIAL ── */}
         {tab === "historial" && (
           <div style={styles.section}>
             <h2 style={styles.sectionTitle}>Historial de envíos</h2>
@@ -448,14 +512,11 @@ export default function App() {
         )}
       </main>
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
-// ─── STYLES ───────────────────────────────────────────────────────────────────
 const styles = {
   root: {
     minHeight: "100vh",
@@ -481,8 +542,6 @@ const styles = {
     fontWeight: 600,
     boxShadow: "0 4px 20px rgba(0,0,0,.4)",
   },
-
-  // Modal
   modalOverlay: {
     position: "fixed",
     inset: 0,
@@ -567,8 +626,6 @@ const styles = {
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
-
-  // Header
   header: {
     padding: "20px 24px",
     borderBottom: "1px solid #1e2535",
@@ -578,7 +635,6 @@ const styles = {
   },
   headerLeft: { display: "flex", alignItems: "center", gap: 12 },
   headerRight: { display: "flex", alignItems: "center", gap: 10 },
-  logo: { fontSize: 32 },
   logoTitle: { fontWeight: 700, fontSize: 17, color: "#f1f5f9" },
   logoSub: { fontSize: 12, color: "#64748b" },
   statusBadge: {
@@ -603,8 +659,6 @@ const styles = {
     fontSize: 12,
     fontWeight: 600,
   },
-
-  // Nav
   nav: {
     display: "flex",
     borderBottom: "1px solid #1e2535",
@@ -625,8 +679,6 @@ const styles = {
     transition: "all .2s",
   },
   tabActive: { color: "#22c55e", borderBottomColor: "#22c55e" },
-
-  // Content
   main: { padding: "24px 24px 0" },
   section: { display: "flex", flexDirection: "column", gap: 16 },
   sectionHeader: {
@@ -700,6 +752,32 @@ const styles = {
     padding: "30px 0",
     fontSize: 14,
   },
+
+  // Toolbar
+  toolbar: { display: "flex", alignItems: "center", gap: 10 },
+  btnTag: {
+    display: "flex",
+    alignItems: "center",
+    gap: 5,
+    padding: "5px 11px",
+    background: "#1e2535",
+    border: "1px solid #2d3748",
+    borderRadius: 6,
+    color: "#94a3b8",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+    fontFamily: "monospace",
+    transition: "all .15s",
+  },
+  btnTagActive: {
+    background: "#0f2a1a",
+    border: "1px solid #22c55e",
+    color: "#22c55e",
+  },
+  tagCheck: { marginLeft: 2, fontSize: 11 },
+  toolbarHint: { fontSize: 11, color: "#475569" },
+
   textarea: {
     width: "100%",
     padding: "14px",
