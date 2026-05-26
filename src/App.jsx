@@ -64,6 +64,8 @@ export default function App() {
   const [guardando, setGuardando] = useState(false);
   const textareaRef = useRef(null);
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
   const showToast = (msg, tipo = "ok") => {
     setToast({ msg, tipo });
     setTimeout(() => setToast(null), 3000);
@@ -99,6 +101,18 @@ export default function App() {
     }, 5000);
     return () => clearInterval(interval);
   }, [cargarDatos]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   // ── Botón booleano de fecha ───────────────────────────────────────────────
   const tieneFecha = mensajeEdit.includes(TAG);
@@ -201,7 +215,7 @@ export default function App() {
     }[status] || status;
 
   return (
-    <div style={styles.root}>
+    <div style={styles.root} className="w-full">
       {toast && (
         <div
           style={{
@@ -259,7 +273,15 @@ export default function App() {
         </div>
       )}
 
-      <header style={styles.header}>
+      <header
+        style={{
+          ...styles.header,
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: "center",
+          gap: isMobile ? 16 : 0,
+          padding: isMobile ? "16px" : "20px 24px",
+        }}
+      >
         <div style={{ ...styles.headerLeft, justifyContent: "center" }}>
           <div style={{ width: 32, height: 32 }}>
             <img
@@ -273,7 +295,7 @@ export default function App() {
             <div style={styles.logoSub}>Panel de recordatorios</div>
           </div>
         </div>
-        <div style={styles.headerRight}>
+        <div style={{ ...styles.headerRight, justifyContent: "center" }}>
           {status === "esperando_qr" && (
             <button style={styles.btnQr} onClick={() => setShowQrModal(true)}>
               <IconQr /> Ver QR
@@ -288,7 +310,9 @@ export default function App() {
         </div>
       </header>
 
-      <nav style={styles.nav}>
+      <nav
+        style={{ ...styles.nav, justifyContent: "center", overflowX: "hidden" }}
+      >
         {[
           { id: "contactos", label: "Contactos", icon: <IconUsers /> },
           { id: "mensaje", label: "Mensaje", icon: <IconMsg /> },
@@ -297,14 +321,21 @@ export default function App() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            style={{ ...styles.tab, ...(tab === t.id ? styles.tabActive : {}) }}
+            style={{
+              ...styles.tab,
+              ...(tab === t.id ? styles.tabActive : {}),
+              gap: isMobile ? 3 : 6,
+              padding: isMobile ? "10px 14px" : "14px 18px",
+            }}
           >
             {t.icon} {t.label}
           </button>
         ))}
       </nav>
 
-      <main style={styles.main}>
+      <main
+        style={{ ...styles.main, padding: isMobile ? "24px 16px" : "24px" }}
+      >
         {tab === "contactos" && (
           <div style={styles.section}>
             <div style={styles.sectionHeader}>
@@ -312,7 +343,12 @@ export default function App() {
                 Contactos <span style={styles.badge}>{contactos.length}</span>
               </h2>
             </div>
-            <div style={styles.addBox}>
+            <div
+              style={{
+                ...styles.addBox,
+                flexDirection: isMobile ? "column" : "row",
+              }}
+            >
               <input
                 style={styles.input}
                 placeholder="Nombre"
@@ -677,6 +713,10 @@ const styles = {
     fontWeight: 500,
     borderBottom: "2px solid transparent",
     transition: "all .2s",
+
+    // responsive
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   tabActive: { color: "#22c55e", borderBottomColor: "#22c55e" },
   main: { padding: "24px 24px 0" },
